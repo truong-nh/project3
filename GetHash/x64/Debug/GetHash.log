@@ -1,0 +1,8 @@
+﻿  GetHash.cpp
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(50,16): warning C4477: 'printf' : format string '%s' requires an argument of type 'char *', but variadic argument 1 has type 'TCHAR *'
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(50,16): message : consider using '%ls' in the format string
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(50,16): message : consider using '%lls' in the format string
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(50,16): message : consider using '%Ls' in the format string
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(50,16): message : consider using '%ws' in the format string
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(268,19): warning C4101: 'filesize': unreferenced local variable
+  GetHash.vcxproj -> D:\HUST\20231\Project3\GetHash\x64\Debug\GetHash.exe
