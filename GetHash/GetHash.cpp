@@ -1,6 +1,8 @@
 ﻿#define _UNICODE 1
 #define UNICODE 1
 
+#include <iostream>
+#include <fstream>
 #include <windows.h>
 #include <tchar.h>
 #include <wincrypt.h>
@@ -9,18 +11,30 @@
 #include <stdlib.h>
 #include <strsafe.h>
 #include<mscat.h>
-#include <iostream>
-#include <iostream>
+#include <ctime>
+#include <time.h>
+#include <filesystem>
+#include <string>
+#include <queue>
+#include <thread>
+#include <shlobj.h>
+
+std::queue <char*> qdata;
+
 
 #pragma comment (lib, "Crypt32")
 #pragma comment (lib, "wintrust")
-
+#pragma warning(disable : 4996) 
 
 /// gethash
 #define BUFSIZE 1024
+#define MAX_PATH 1024
 #define MD5LEN  16
+namespace fs = std::experimental::filesystem;
+using namespace std;
+
 BOOL VerifySignature(LPCWSTR path);
-DWORD gethash(TCHAR* filename)
+char* gethash(TCHAR* filename)
 {
 
     DWORD dwStatus = 0;
@@ -33,8 +47,6 @@ DWORD gethash(TCHAR* filename)
     BYTE rgbHash[MD5LEN];
     DWORD cbHash = 0;
     CHAR rgbDigits[] = "0123456789abcdef";
-    //LPCWSTR filename = L"D:\\HUST\\20231\\Project3\\svchost.exe";
-    // Logic to check usage goes here.
 
     hFile = CreateFile(filename,
         GENERIC_READ,
@@ -49,10 +61,8 @@ DWORD gethash(TCHAR* filename)
         dwStatus = GetLastError();
         printf("Error opening file %s\nError: %d\n", filename,
             dwStatus);
-        return dwStatus;
     }
 
-    // Get handle to the crypto provider
     if (!CryptAcquireContext(&hProv,
         NULL,
         NULL,
@@ -62,7 +72,6 @@ DWORD gethash(TCHAR* filename)
         dwStatus = GetLastError();
         printf("CryptAcquireContext failed: %d\n", dwStatus);
         CloseHandle(hFile);
-        return dwStatus;
     }
 
     if (!CryptCreateHash(hProv, CALG_MD5, 0, 0, &hHash))
@@ -71,7 +80,6 @@ DWORD gethash(TCHAR* filename)
         printf("CryptAcquireContext failed: %d\n", dwStatus);
         CloseHandle(hFile);
         CryptReleaseContext(hProv, 0);
-        return dwStatus;
     }
 
     while (bResult = ReadFile(hFile, rgbFile, BUFSIZE,
@@ -89,7 +97,6 @@ DWORD gethash(TCHAR* filename)
             CryptReleaseContext(hProv, 0);
             CryptDestroyHash(hHash);
             CloseHandle(hFile);
-            return dwStatus;
         }
     }
 
@@ -100,17 +107,20 @@ DWORD gethash(TCHAR* filename)
         CryptReleaseContext(hProv, 0);
         CryptDestroyHash(hHash);
         CloseHandle(hFile);
-        return dwStatus;
     }
 
+    CHAR hash[33];
+    hash[32] = NULL;
     cbHash = MD5LEN;
     if (CryptGetHashParam(hHash, HP_HASHVAL, rgbHash, &cbHash, 0))
     {
-        //printf("MD5 hash of file %s is: ", filename);
+
         for (DWORD i = 0; i < cbHash; i++)
         {
             printf("%c%c", rgbDigits[rgbHash[i] >> 4],
                 rgbDigits[rgbHash[i] & 0xf]);
+            hash[i * 2] = rgbDigits[rgbHash[i] >> 4];
+            hash[i * 2 + 1] = rgbDigits[rgbHash[i] & 0xf];
         }
         printf("\n");
     }
@@ -125,127 +135,15 @@ DWORD gethash(TCHAR* filename)
     CloseHandle(hFile);
 
 
-    return dwStatus;
+    return hash;
 }
 
 
-BOOL VerifyEmbeddedSignature(LPCWSTR pwszSourceFile)
-{
-    LONG lStatus;
-    DWORD dwLastError;
 
-    WINTRUST_FILE_INFO FileData;
-    memset(&FileData, 0, sizeof(FileData));
-    FileData.cbStruct = sizeof(WINTRUST_FILE_INFO);
-    FileData.pcwszFilePath = pwszSourceFile;
-    FileData.hFile = NULL;
-    FileData.pgKnownSubject = NULL;
-
-    GUID WVTPolicyGUID = WINTRUST_ACTION_GENERIC_VERIFY_V2;
-    WINTRUST_DATA WinTrustData;
-    memset(&WinTrustData, 0, sizeof(WinTrustData));
-
-    WinTrustData.cbStruct = sizeof(WinTrustData);
-    WinTrustData.pPolicyCallbackData = NULL;
-    WinTrustData.pSIPClientData = NULL;
-    WinTrustData.dwUIChoice = WTD_UI_NONE;
-    WinTrustData.fdwRevocationChecks = WTD_REVOKE_NONE;
-    WinTrustData.dwUnionChoice = WTD_CHOICE_FILE;
-    WinTrustData.dwStateAction = WTD_STATEACTION_VERIFY;
-    WinTrustData.hWVTStateData = NULL;
-    WinTrustData.pwszURLReference = NULL;
-
-    WinTrustData.dwUIContext = 0;
-
-    WinTrustData.pFile = &FileData;
+bool checkFilePE(TCHAR* filepath) {
 
 
-    lStatus = WinVerifyTrust(NULL,&WVTPolicyGUID,&WinTrustData);
-
-    switch (lStatus)
-    {
-    case ERROR_SUCCESS:
-       
-        return false;
-        break;
-
-    case TRUST_E_NOSIGNATURE:
-        // The file was not signed or had a signature 
-        // that was not valid.
-
-        // Get the reason for no signature.
-        dwLastError = GetLastError();
-        if (TRUST_E_NOSIGNATURE == dwLastError ||
-            TRUST_E_SUBJECT_FORM_UNKNOWN == dwLastError ||
-            TRUST_E_PROVIDER_UNKNOWN == dwLastError)
-        {
-            // The file was not signed.
-            wprintf_s(L"The file \"%s\" is not signed.\n",
-                pwszSourceFile);
-        }
-        else
-        {
-            // The signature was not valid or there was an error 
-            // opening the file.
-            wprintf_s(L"An unknown error occurred trying to "
-                L"verify the signature of the \"%s\" file.\n",
-                pwszSourceFile);
-        }
-
-        break;
-
-    case TRUST_E_EXPLICIT_DISTRUST:
-        // The hash that represents the subject or the publisher 
-        // is not allowed by the admin or user.
-        wprintf_s(L"The signature is present, but specifically "
-            L"disallowed.\n");
-        break;
-
-    case TRUST_E_SUBJECT_NOT_TRUSTED:
-        // The user clicked "No" when asked to install and run.
-        wprintf_s(L"The signature is present, but not "
-            L"trusted.\n");
-        break;
-
-    case CRYPT_E_SECURITY_SETTINGS:
-        /*
-        The hash that represents the subject or the publisher
-        was not explicitly trusted by the admin and the
-        admin policy has disabled user trust. No signature,
-        publisher or time stamp errors.
-        */
-        wprintf_s(L"CRYPT_E_SECURITY_SETTINGS - The hash "
-            L"representing the subject or the publisher wasn't "
-            L"explicitly trusted by the admin and admin policy "
-            L"has disabled user trust. No signature, publisher "
-            L"or timestamp errors.\n");
-        break;
-
-    default:
-        // The UI was disabled in dwUIChoice or the admin policy 
-        // has disabled user trust. lStatus contains the 
-        // publisher or time stamp chain error.
-        wprintf_s(L"Error is: 0x%x.\n",
-            lStatus);
-        break;
-    }
-
-    // Any hWVTStateData must be released by a call with close.
-    WinTrustData.dwStateAction = WTD_STATEACTION_CLOSE;
-
-    lStatus = WinVerifyTrust(
-        NULL,
-        &WVTPolicyGUID,
-        &WinTrustData);
-
-    return true;
-}
-
-
-bool checkFilePE(HANDLE hFile) {
-
-
-
+    HANDLE hFile = CreateFile(filepath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile != INVALID_HANDLE_VALUE) {
         IMAGE_DOS_HEADER dosHeader;
         DWORD bytesRead;
@@ -262,227 +160,83 @@ bool checkFilePE(HANDLE hFile) {
     return false;
 }
 
-void checkDir(TCHAR* dir)
+void checkDir(TCHAR* dir, string filecsv)
 {
     WIN32_FIND_DATA ffd;
     LARGE_INTEGER filesize;
     TCHAR szDir[MAX_PATH];
     TCHAR filepath[MAX_PATH];
+    TCHAR directory[MAX_PATH];
     HANDLE hFind = INVALID_HANDLE_VALUE;
-
-    _tprintf(TEXT("\n ------------------------------------\n\n"));
-    _tprintf(TEXT("\n ------------------------------------\n\n"));
-
-    _tprintf(TEXT("\n ------------------------------------\n\n"));
-
-    _tprintf(TEXT("\n ------------------------------------\n\n"));
-
-    _tprintf(TEXT("\n ra soat thu muc: %s\n\n"), dir);
+    _tprintf(TEXT("\nFolder: %s\n\n"), dir);
 
 
 
     StringCchCopy(szDir, MAX_PATH, dir);
     StringCchCat(szDir, MAX_PATH, TEXT("\\*"));
-    StringCchCat(dir, MAX_PATH, TEXT("\\"));
+    StringCchCopy(directory, MAX_PATH, dir);
+    StringCchCat(directory, MAX_PATH, TEXT("\\"));
 
     // Find the first file in the directory.
     hFind = FindFirstFile(szDir, &ffd);
 
-
+    char* hashfile;
     do
     {
         if (!(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))   // if not directory
         {
 
 
-            StringCchCopy(filepath, MAX_PATH, dir);
+            StringCchCopy(filepath, MAX_PATH, directory);
             StringCchCat(filepath, MAX_PATH, ffd.cFileName);
-            HANDLE hFile = CreateFile(filepath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+            //HANDLE hFile = CreateFile(filepath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
 
-            if (checkFilePE(hFile)) {
+            if (checkFilePE(filepath)) {
                 if (!VerifySignature(filepath)) {
-                   // filesize.LowPart = ffd.nFileSizeLow;
-                   // filesize.HighPart = ffd.nFileSizeHigh;
-                    _tprintf(TEXT("  %s   \n"), ffd.cFileName);
-                    gethash(filepath);
+                    _tprintf(TEXT("%s     "), ffd.cFileName);
+
+                    int size = WideCharToMultiByte(CP_UTF8, 0, filepath, -1, NULL, 0, NULL, NULL);
+
+                    char* charString = new char[size + 33];
+
+
+                    // Convert _TCHAR to char and write csv
+                    WideCharToMultiByte(CP_UTF8, 0, filepath, -1, charString, size, NULL, NULL);
+                    char* hashfile = gethash(filepath);
+
+                    strncat(charString, ",", 1);
+                    strncat(charString, hashfile, 32);
+                    qdata.push(charString);
 
                 }
 
+            }
+        }
+        else {
+            StringCchCopy(filepath, MAX_PATH, directory);
+            StringCchCat(filepath, MAX_PATH, ffd.cFileName);
+            if (wcscmp(ffd.cFileName, L".") == 0 || wcscmp(ffd.cFileName, L"..") == 0) {
+                // Nếu là thư mục gốc hoặc thư mục cha
+                continue;
+            }
+            else {
+                // Nếu không phải là thư mục gốc hoặc thư mục cha
+              // checkDir(filepath, filecsv);
             }
         }
     } while (FindNextFile(hFind, &ffd) != 0); // check next file
 
 
     FindClose(hFind);
+
+    //char time1[80];
+    //std::time_t currentTime1 = std::time(nullptr);
+
+    //std::strftime(time1, sizeof(time1), "%Y%m%d_%H%M%S", std::localtime(&currentTime1));
+   // cout << time1 << "\n";
+
     return;
 }
-
-/*
-int checkCatlog() {
-    LPBYTE lpHash;
-
-    DWORD dwHashSize;
-
-
-
-    if (CalcCatHash(lpPath, &dwHashSize, &lpHash))
-
-    {
-
-        HANDLE hCatalogContext = CryptCATAdminEnumCatalogFromHash(hHandle, lpHash, dwHashSize, 0, NULL);
-
-        if (NULL != hCatalogContext)
-
-        {
-            
-            CryptCATAdminEnumCatalogFromHash(hHandle, hCatalogContext, 0);
-
-            nResult = 2;
-
-        }
-
-
-
-        LocalFree(lpHash);
-
-        lpHash = NULL;
-
-    }
-}
-*/
-
-/*
-bool verifyembeddedsignature(LPCWSTR pwszsourcefile)
-{
-    long lstatus;
-    
-    GUID wintrustverifyguid = WINTRUST_ACTION_GENERIC_VERIFY_V2;
-    GUID driveractionguid = DRIVER_ACTION_VERIFY;
-    HANDLE hfile;
-    DWORD dwhash;
-    byte bhash[100];
-    HCATINFO hcatinfo;
-    HCATADMIN hcatadmin;
-
-    WINTRUST_DATA    wd = { 0 };
-    WINTRUST_FILE_INFO wfi = { 0 };
-    WINTRUST_CATALOG_INFO wci = { 0 };
-
-    ////set up structs to verify files with cert signatures
-    memset(&wfi, 0, sizeof(wfi));
-    wfi.cbStruct = sizeof(WINTRUST_FILE_INFO);
-    wfi.pcwszFilePath = pwszsourcefile;
-    wfi.hFile = NULL;
-    wfi.pgKnownSubject = NULL;
-
-    memset(&wd, 0, sizeof(wd));
-    wd.cbStruct = sizeof(WINTRUST_DATA);
-    wd.dwUnionChoice = WTD_CHOICE_FILE;
-    wd.pFile = &wfi;
-    wd.dwUIChoice = WTD_UI_NONE;
-    wd.fdwRevocationChecks = WTD_REVOKE_NONE;   
-    wd.dwStateAction = 0;
-    wd.dwProvFlags = WTD_SAFER_FLAG;
-    wd.hWVTStateData = NULL;
-    wd.pwszURLReference = NULL;
-    wd.pPolicyCallbackData = NULL;
-    wd.pSIPClientData = NULL;
-    wd.dwUIContext = 0;
-
-    lstatus = WinVerifyTrust(NULL, &wintrustverifyguid, &wd);
-
-    ////if failed, try to verify using catalog files
-    if (lstatus != ERROR_SUCCESS)
-    {
-        //open the file
-        hfile = CreateFileW(pwszsourcefile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (hfile == INVALID_HANDLE_VALUE)
-            return false;
-
-        dwhash = sizeof(bhash);
-        if (!CryptCATAdminCalcHashFromFileHandle(hfile, &dwhash, bhash, 0))
-        {
-            CloseHandle(hfile);
-            return false;
-            
-        }
-
-        //create a string form of the hash (used later in pszmembertag)
-        
-
-        if (!CryptCATAdminAcquireContext(&hcatadmin, &driveractionguid, 0))
-        {
-            CloseHandle(hfile);
-            return false;
-        }
-
-       
-
-        if (!CryptCATAdminAcquireContext(&hcatadmin, &driveractionguid, 0))
-        {
-            CloseHandle(hfile);
-            return false;
-        }
-
-        //find the catalog which contains the hash
-        hcatinfo = CryptCATAdminEnumCatalogFromHash(hcatadmin, bhash, dwhash, 0, NULL);
-        
-        if (hcatinfo)
-        {
-            CATALOG_INFO ci = { 0 };
-            
-            CryptCATCatalogInfoFromContext(hcatinfo, &ci, 0);
-            
-     
-
-            wd.cbstruct = sizeof(wintrust_data);
-            wd.dwunionchoice = wtd_choice_catalog;
-            wd.pcatalog = &wci;
-            wd.dwuichoice = wtd_ui_none;
-            wd.fdwrevocationchecks = wtd_stateaction_verify;
-            wd.dwprovflags = 0;
-            wd.hwvtstatedata = null;
-            wd.pwszurlreference = null;
-            wd.ppolicycallbackdata = null;
-            wd.psipclientdata = null;
-            wd.dwuicontext = 0;
-
-            memset(&wci, 0, sizeof(wci));
-            wci.cbStruct = sizeof(WINTRUST_CATALOG_INFO);
-            wci.pcwszCatalogFilePath = ci.wszCatalogFile;
-            wci.pcwszMemberFilePath = pwszsourcefile;
-            wci.pcwszMemberTag = pszmembertag;psmembertag
-
-            memset(&wd, 0, sizeof(wd));
-            wd.cbStruct = sizeof(wintrust_data);
-            wd.dwUnionChoice = wtd_choice_catalog;
-            wd.pCatalog = &wci;
-            wd.dwUIChoice = wtd_ui_none;
-            wd.fdwRevocationChecks = wtd_stateaction_verify;
-            wd.dwProvFlags = 0;
-            wd.hWVTStateData = null;
-            wd.pwszURLReference = null;
-            wd.pPolicyCallbackData = null;
-            wd.pSIPClientData = null;
-            wd.dwUIContext = 0;
-
-            lstatus = winverifytrust(null, &wintrustverifyguid, &wd);
-
-            cryptcatadminreleasecatalogcontext(hcatadmin, hcatinfo, 0);
-        }
-
-
-        cryptcatadminreleasecontext(hcatadmin, 0);
-        delete[] pszmembertag;
-        closehandle(hfile);
-    }
-
-    if (lstatus != error_success)
-        return false;
-    else
-        return true;
-}
-*/
 
 BOOL VerifySignature(LPCWSTR path) //We will receive the char* filepath not wchar*
 {
@@ -603,62 +357,114 @@ BOOL VerifySignature(LPCWSTR path) //We will receive the char* filepath not wcha
 }
 
 
-int _tmain(int argc, _TCHAR* argv[]){
-    
+int _tmain(int argc, _TCHAR* argv[]) {
+
+    std::time_t currentTime = std::time(nullptr);
+
+    // Chuyển đổi thời gian thành chuỗi định dạng
+    char time[80];
+    std::strftime(time, sizeof(time), "%Y%m%d_%H%M%S", std::localtime(&currentTime));
+    //std::cout << "Thời gian hiện tại: " << time << std::endl;
+    //cout << time;
+    std::string directoryPath = "C:\\gethash";
+    CreateDirectory(L"C:\gethash", NULL);
+    std::string filename = "C:\\gethash\\" + std::string(time) + ".csv";
+    CreateDirectory(L"C:\gethash", NULL);
+
+    std::ofstream csvFile(filename);
+    if (!csvFile.is_open()) {
+        std::cerr << "Run as administrator\n";
+        return 1;
+    }
+    csvFile.close();
+
+
     if (argc == 1)
     {
         printf("Code by truongnh \n");
-
-        printf("-s :   %s\n", "system32 và syswow64 ");
+        printf("-s :   %s\n", "system32 , syswow64, SystemDrive, downloads ");
         printf("-fp :   %s\n", "filepath");
+        printf("comandline : -fp filepath \n  for example check folder D:\\user\\truongnh: GetHash.exe -fp D:\\user\\truongnh \n");
 
-        printf("-a :   %s\n", " ");
     }
+
 
     else {
         if (_tcscmp(argv[1], _T("-s")) == 0)
         {
-            printf("-s :   %s\n", "lua chon ra soat s ");
+            printf("-s :   %s\n", "Folder: system32 , syswow64, SystemDrive, downloads  ");
 
-        }
+            char sDrive[MAX_PATH];
+            int result = GetWindowsDirectoryA(sDrive, MAX_PATH);
+            TCHAR* dirSystemDrive = new TCHAR[result + 1];
 
-        if (_tcscmp(argv[1], _T("-e")) == 0)
-        {
-            printf("-fp :   %s\n", "lua chon ra soat e");
+            MultiByteToWideChar(CP_ACP, 0, sDrive, MAX_PATH, dirSystemDrive, result);
+            dirSystemDrive[result] = '\0';
+
+            PWSTR sdownload;
+            int result1 = SHGetKnownFolderPath(FOLDERID_Downloads, 0, nullptr, &sdownload);
+
+            TCHAR dirDownloads[MAX_PATH];
+            _tcscpy(dirDownloads, sdownload);
+
+            TCHAR dirSystem32[1024] = _T("C:\\windows\\system32");
+            TCHAR dirSyswow64[1024] = _T("C:\\windows\\syswow64");
+            std::thread syswow64(checkDir, dirSyswow64, filename);
+            std::thread system32(checkDir, dirSystem32, filename);
+
+            //(dirSystem32, filename); 
+            //checkDir(dirSyswow64, filename);
+            syswow64.join(); //system32 chay lau hon syswow64
+
+            std::thread systemDrive(checkDir, dirSystemDrive, filename);
+            std::thread dowloads(checkDir, dirDownloads, filename);
+            systemDrive.join();
+            dowloads.join();
+
+            system32.join();
+
+            std::ofstream csvFile(filename, std::ios::app);
+
+            while (!qdata.empty())
+            {
+                csvFile << qdata.front();
+                csvFile << "\n";
+
+                qdata.pop();
+            }
+            csvFile.close();
 
         }
 
         if (_tcscmp(argv[1], _T("-fp")) == 0)
         {
-            _tprintf(_T("ra soat thu muc :   %d\n"), argc);
+            TCHAR filepath[MAX_PATH] = _T("");
+            
+            if (argc >= 3) {
+                _tcsncat(filepath, argv[2], 1024);
+                for (int i = 3; i < argc; i++) {
+                    _tcsncat(filepath, _T(" "), 1024);
+                    _tcsncat(filepath, argv[i], 1024);
 
-            printf("-fp :   %s\n", "lua chon ra soat thu muc");
-            printf("comandline : -fp filepath \nvd ra soat thu muc truongnh và truongnh1: GetHash.exe -fp D:\\user\\truongnh D:\\user\\truongnh1 \n");
-            if (argc > 2) {
-                _tprintf(_T("ra soat thu muc :   %s\n"), _T("system32"));
-
-                _tprintf(_T("ra soat thu muc :   %s\n"), _T("syswow64"));
-
-                for (int i = 2; i < argc; i++) {
-                    _tprintf(_T("ra soat thu muc :   %s\n"), argv[i]);
                 }
+                checkDir(filepath, filename);
+
             }
 
         }
+        std::ofstream csvFile(filename, std::ios::app);
 
+        while (!qdata.empty())
+        {
+            csvFile << qdata.front();
+            csvFile << "\n";
 
-        //TCHAR dirSystem32[1024] = _T("C:\\windows\\system32");
-        //TCHAR dirSyswow64[1024] = _T("C:\\windows\\syswow64");
+            qdata.pop();
+        }
+        csvFile.close();
 
-        //checkDir(dirSystem32);
-        //checkDir(dirSyswow64);
+        cout<<"file output:  " << filename;
     }
-    
 
-   //  TCHAR dirproject[1024] = _T("D:\\HUST\\20231\\Project3");
-
-    // TCHAR filepath[1024] = _T("D:\\HUST\\20231\\Project3\\GetHash.exe");
-
-    
-    //checkDir(dirproject);
+    return 0;
 }

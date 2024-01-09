@@ -1,8 +1,15 @@
 ﻿  GetHash.cpp
-D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(50,16): warning C4477: 'printf' : format string '%s' requires an argument of type 'char *', but variadic argument 1 has type 'TCHAR *'
-D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(50,16): message : consider using '%ls' in the format string
-D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(50,16): message : consider using '%lls' in the format string
-D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(50,16): message : consider using '%Ls' in the format string
-D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(50,16): message : consider using '%ws' in the format string
-D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(268,19): warning C4101: 'filesize': unreferenced local variable
+C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.35.32215\include\filesystem(13): warning STL4038: The contents of <filesystem> are available only with C++17 or later.
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(31,1): warning C4005: 'MAX_PATH': macro redefinition
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\shared\minwindef.h(60,1): message : see previous definition of 'MAX_PATH'
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(62,16): warning C4477: 'printf' : format string '%s' requires an argument of type 'char *', but variadic argument 1 has type 'TCHAR *'
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(62,16): message : consider using '%ls' in the format string
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(62,16): message : consider using '%lls' in the format string
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(62,16): message : consider using '%Ls' in the format string
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(62,16): message : consider using '%ws' in the format string
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(183,11): warning C4101: 'hashfile': unreferenced local variable
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(166,19): warning C4101: 'filesize': unreferenced local variable
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(370,21): warning C4129: 'g': unrecognized character escape sequence
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(372,21): warning C4129: 'g': unrecognized character escape sequence
+D:\HUST\20231\Project3\GetHash\GetHash\GetHash.cpp(138): warning C4172: returning address of local variable or temporary: hash
   GetHash.vcxproj -> D:\HUST\20231\Project3\GetHash\x64\Debug\GetHash.exe
